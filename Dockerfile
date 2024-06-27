@@ -114,8 +114,8 @@ RUN pip install -r requirements/pip.txt
 RUN pip install -r requirements/edx/base.txt
 
 # Install node and npm
-RUN nodeenv /edx/app/edxapp/nodeenv --node=16.14.0 --prebuilt
-RUN npm install -g npm@8.5.x
+RUN nodeenv /edx/app/edxapp/nodeenv --node=18.19.0 --prebuilt
+RUN npm install -g npm@10.5.x
 
 # This script is used by an npm post-install hook.
 # We copy it into the image now so that it will be available when we run `npm install` in the next step.
@@ -147,16 +147,20 @@ COPY . .
 # Install Python requirements again in order to capture local projects
 RUN pip install -e .
 
+# Setting edx-platform directory as safe for git commands
+RUN git config --global --add safe.directory /edx/app/edxapp/edx-platform
+
 # Production target
 FROM base as production
 
 USER app
 
 ENV EDX_PLATFORM_SETTINGS='docker-production'
-ENV SERVICE_VARIANT "${SERVICE_VARIANT}"
-ENV SERVICE_PORT "${SERVICE_PORT}"
+ENV SERVICE_VARIANT="${SERVICE_VARIANT}"
+ENV SERVICE_PORT="${SERVICE_PORT}"
 ENV DJANGO_SETTINGS_MODULE="${SERVICE_VARIANT}.envs.$EDX_PLATFORM_SETTINGS"
 EXPOSE ${SERVICE_PORT}
+
 CMD gunicorn \
     -c /edx/app/edxapp/edx-platform/${SERVICE_VARIANT}/docker_${SERVICE_VARIANT}_gunicorn.py \
     --name ${SERVICE_VARIANT} \
@@ -187,6 +191,6 @@ RUN ln -s "$(pwd)/cms/envs/devstack-experimental.yml" "/edx/etc/studio.yml"
 RUN touch ../edxapp_env
 
 ENV EDX_PLATFORM_SETTINGS='devstack_docker'
-ENV SERVICE_VARIANT "${SERVICE_VARIANT}"
+ENV SERVICE_VARIANT="${SERVICE_VARIANT}"
 EXPOSE ${SERVICE_PORT}
 CMD ./manage.py ${SERVICE_VARIANT} runserver 0.0.0.0:${SERVICE_PORT}

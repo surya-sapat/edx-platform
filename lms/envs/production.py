@@ -22,9 +22,10 @@ import datetime
 import os
 
 import yaml
-from corsheaders.defaults import default_headers as corsheaders_default_headers
+import django
 from django.core.exceptions import ImproperlyConfigured
 from edx_django_utils.plugins import add_plugins
+from openedx_events.event_bus import merge_producer_configs
 from path import Path as path
 
 from openedx.core.djangoapps.plugins.constants import ProjectType, SettingsType
@@ -83,6 +84,7 @@ with codecs.open(CONFIG_FILE, encoding='utf-8') as f:
         'MKTG_URL_LINK_MAP',
         'MKTG_URL_OVERRIDES',
         'REST_FRAMEWORK',
+        'EVENT_BUS_PRODUCER_CONFIG',
     ]
     for key in KEYS_WITH_MERGED_VALUES:
         if key in __config_copy__:
@@ -366,6 +368,11 @@ CSRF_COOKIE_SECURE = ENV_TOKENS.get('CSRF_COOKIE_SECURE', False)
 
 # Determines which origins are trusted for unsafe requests eg. POST requests.
 CSRF_TRUSTED_ORIGINS = ENV_TOKENS.get('CSRF_TRUSTED_ORIGINS', [])
+# values are already updated above with default CSRF_TRUSTED_ORIGINS values but in
+# case of new django version these values will override.
+if django.VERSION[0] >= 4:  # for greater than django 3.2 use schemes.
+    CSRF_TRUSTED_ORIGINS = ENV_TOKENS.get('CSRF_TRUSTED_ORIGINS_WITH_SCHEME', [])
+
 ############# CORS headers for cross-domain requests #################
 
 if FEATURES.get('ENABLE_CORS_HEADERS') or FEATURES.get('ENABLE_CROSS_DOMAIN_CSRF_COOKIE'):
@@ -374,9 +381,6 @@ if FEATURES.get('ENABLE_CORS_HEADERS') or FEATURES.get('ENABLE_CROSS_DOMAIN_CSRF
 
     CORS_ORIGIN_ALLOW_ALL = ENV_TOKENS.get('CORS_ORIGIN_ALLOW_ALL', False)
     CORS_ALLOW_INSECURE = ENV_TOKENS.get('CORS_ALLOW_INSECURE', False)
-    CORS_ALLOW_HEADERS = corsheaders_default_headers + (
-        'use-jwt-cookie',
-    )
 
     # If setting a cross-domain cookie, it's really important to choose
     # a name for the cookie that is DIFFERENT than the cookies used
@@ -516,14 +520,6 @@ EMAIL_HOST_PASSWORD = AUTH_TOKENS.get('EMAIL_HOST_PASSWORD', '')  # django defau
 BLOCKSTORE_API_URL = ENV_TOKENS.get('BLOCKSTORE_API_URL', None)  # e.g. "https://blockstore.example.com/api/v1/"
 # Configure an API auth token at (blockstore URL)/admin/authtoken/token/
 BLOCKSTORE_API_AUTH_TOKEN = AUTH_TOKENS.get('BLOCKSTORE_API_AUTH_TOKEN', None)
-
-# Datadog for events!
-DATADOG = AUTH_TOKENS.get("DATADOG", {})
-DATADOG.update(ENV_TOKENS.get("DATADOG", {}))
-
-# TODO: deprecated (compatibility with previous settings)
-if 'DATADOG_API' in AUTH_TOKENS:
-    DATADOG['api_key'] = AUTH_TOKENS['DATADOG_API']
 
 # Analytics API
 ANALYTICS_API_KEY = AUTH_TOKENS.get("ANALYTICS_API_KEY", ANALYTICS_API_KEY)
@@ -761,6 +757,11 @@ SEARCH_SKIP_INVITATION_ONLY_FILTERING = ENV_TOKENS.get(
 SEARCH_SKIP_SHOW_IN_CATALOG_FILTERING = ENV_TOKENS.get(
     'SEARCH_SKIP_SHOW_IN_CATALOG_FILTERING',
     SEARCH_SKIP_SHOW_IN_CATALOG_FILTERING,
+)
+
+SEARCH_COURSEWARE_CONTENT_LOG_PARAMS = ENV_TOKENS.get(
+    'SEARCH_COURSEWARE_CONTENT_LOG_PARAMS',
+    SEARCH_COURSEWARE_CONTENT_LOG_PARAMS,
 )
 
 # TODO: Once we have successfully upgraded to ES7, switch this back to ELASTIC_SEARCH_CONFIG.
@@ -1104,6 +1105,9 @@ DISCUSSIONS_MICROFRONTEND_URL = ENV_TOKENS.get('DISCUSSIONS_MICROFRONTEND_URL', 
 ################### Discussions micro frontend Feedback URL###################
 DISCUSSIONS_MFE_FEEDBACK_URL = ENV_TOKENS.get('DISCUSSIONS_MFE_FEEDBACK_URL', DISCUSSIONS_MFE_FEEDBACK_URL)
 
+############################ AI_TRANSLATIONS URL ##################################
+AI_TRANSLATIONS_API_URL = ENV_TOKENS.get('AI_TRANSLATIONS_API_URL', AI_TRANSLATIONS_API_URL)
+
 ############## DRF overrides ##############
 REST_FRAMEWORK.update(ENV_TOKENS.get('REST_FRAMEWORK', {}))
 
@@ -1117,13 +1121,12 @@ COURSE_LIVE_GLOBAL_CREDENTIALS["BIG_BLUE_BUTTON"] = {
     "URL": ENV_TOKENS.get('BIG_BLUE_BUTTON_GLOBAL_URL', None),
 }
 
-############## Settings for survey report ##############
-SURVEY_REPORT_EXTRA_DATA = ENV_TOKENS.get('SURVEY_REPORT_EXTRA_DATA', {})
-SURVEY_REPORT_ENDPOINT = ENV_TOKENS.get('SURVEY_REPORT_ENDPOINT',
-                                        'https://hooks.zapier.com/hooks/catch/11595998/3ouwv7m/')
-ANONYMOUS_SURVEY_REPORT = False
-
 AVAILABLE_DISCUSSION_TOURS = ENV_TOKENS.get('AVAILABLE_DISCUSSION_TOURS', [])
 
 ############## NOTIFICATIONS EXPIRY ##############
 NOTIFICATIONS_EXPIRY = ENV_TOKENS.get('NOTIFICATIONS_EXPIRY', NOTIFICATIONS_EXPIRY)
+
+############## Event bus producer ##############
+EVENT_BUS_PRODUCER_CONFIG = merge_producer_configs(EVENT_BUS_PRODUCER_CONFIG,
+                                                   ENV_TOKENS.get('EVENT_BUS_PRODUCER_CONFIG', {}))
+BEAMER_PRODUCT_ID = ENV_TOKENS.get('BEAMER_PRODUCT_ID', BEAMER_PRODUCT_ID)

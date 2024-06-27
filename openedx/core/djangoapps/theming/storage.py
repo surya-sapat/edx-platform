@@ -229,6 +229,13 @@ class ThemeManifestFilesMixin(ManifestFilesMixin):
                 hashed_files=hashed_files,
             )
 
+            # NOTE:
+            # The line below was commented out so that absolute urls are used instead of relative urls to make themed
+            # assets work correctly.
+            #
+            # The line is commented and not removed to make future django upgrade easier and show exactly what is
+            # changed in this method override
+            #
             # transformed_url = "/".join(
             #  url_path.split("/")[:-1] + hashed_url.split("/")[-1:]
             # )

@@ -199,12 +199,6 @@ urlpatterns = [
     # Learner Home
     path('api/learner_home/', include('lms.djangoapps.learner_home.urls', namespace='learner_home')),
 
-    # Learner Recommendations
-    path(
-        'api/learner_recommendations/',
-        include('lms.djangoapps.learner_recommendations.urls', namespace='learner_recommendations')
-    ),
-
     path(
         'api/experiments/',
         include(
@@ -224,12 +218,7 @@ urlpatterns = [
 
 if settings.FEATURES.get('ENABLE_MOBILE_REST_API'):
     urlpatterns += [
-        re_path(r'^api/mobile/(?P<api_version>v(2|1|0.5))/', include('lms.djangoapps.mobile_api.urls')),
-    ]
-
-if settings.FEATURES.get('ENABLE_OPENBADGES'):
-    urlpatterns += [
-        path('api/badges/v1/', include(('lms.djangoapps.badges.api.urls', 'badges'), namespace='badges_api')),
+        re_path(r'^api/mobile/(?P<api_version>v(3|2|1|0.5))/', include('lms.djangoapps.mobile_api.urls')),
     ]
 
 urlpatterns += [
@@ -759,6 +748,11 @@ urlpatterns += [
         ),
         courseware_views.courseware_mfe_search_enabled,
         name='courseware_search_enabled_view',
+    ),
+    re_path(
+        fr'^courses/{settings.COURSE_ID_PATTERN}/courseware-navigation-sidebar/toggles/$',
+        courseware_views.courseware_mfe_navigation_sidebar_toggles,
+        name='courseware_navigation_sidebar_toggles_view',
     ),
 ]
 

@@ -12,8 +12,8 @@ from web_fragments.fragment import Fragment
 from xblock.completable import XBlockCompletionMode
 from xblock.core import XBlock
 from xblock.fields import UNIQUE_ID, Scope, String
-from xblockutils.resources import ResourceLoader
-from xblockutils.studio_editable import StudioEditableXBlockMixin
+from xblock.utils.resources import ResourceLoader
+from xblock.utils.studio_editable import StudioEditableXBlockMixin
 
 from lms.djangoapps.discussion.django_comment_client.permissions import has_permission
 from openedx.core.djangoapps.discussions.models import DiscussionsConfiguration, Provider
@@ -233,7 +233,7 @@ class DiscussionXBlock(XBlock, StudioEditableXBlockMixin, XmlMixin):  # lint-amn
         return {'topic_id': self.discussion_id}
 
     @classmethod
-    def parse_xml(cls, node, runtime, keys, id_generator):
+    def parse_xml(cls, node, runtime, keys):
         """
         Parses OLX into XBlock.
 
@@ -246,7 +246,7 @@ class DiscussionXBlock(XBlock, StudioEditableXBlockMixin, XmlMixin):  # lint-amn
         XBlock.parse_xml. Otherwise this method parses file in "discussion" folder (known as definition_xml), applies
         policy.json and updates fields accordingly.
         """
-        block = super().parse_xml(node, runtime, keys, id_generator)
+        block = super().parse_xml(node, runtime, keys)
 
         cls._apply_metadata_and_policy(block, node, runtime)
 

@@ -57,9 +57,9 @@ from openedx.core.djangoapps.ace_common.template_context import get_base_templat
 from openedx.core.djangoapps.api_admin.models import ApiAccessRequest
 from openedx.core.djangoapps.course_groups.models import UnregisteredLearnerCohortAssignments
 from openedx.core.djangoapps.credit.models import CreditRequest, CreditRequirementStatus
-from openedx.core.djangoapps.external_user_ids.models import ExternalId, ExternalIdType
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from openedx.core.djangoapps.profile_images.images import remove_profile_images
+from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.user_api import accounts
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, set_has_profile_image
 from openedx.core.djangoapps.user_api.accounts.utils import handle_retirement_cancellation
@@ -92,11 +92,6 @@ from .serializers import (
 )
 from .signals import USER_RETIRE_LMS_CRITICAL, USER_RETIRE_LMS_MISC, USER_RETIRE_MAILINGS
 from .utils import create_retirement_request_and_deactivate_account, username_suffix_generator
-
-try:
-    from coaching.api import has_ever_consented_to_coaching
-except ImportError:
-    has_ever_consented_to_coaching = None
 
 log = logging.getLogger(__name__)
 
@@ -249,9 +244,6 @@ class AccountViewSet(ViewSet):
               profile. Possible values are "all_users", "private", or "custom".
               If "custom", the user has selectively chosen a subset of shareable
               fields to make visible to others via the User Preferences API.
-
-            * accomplishments_shared: Signals whether badges are enabled on the
-              platform and should be fetched.
 
             * phone_number: The phone number for the user. String of numbers with
               an optional `+` sign at the start.
@@ -464,7 +456,6 @@ class NameChangeView(ViewSet):
     """
     Viewset to manage profile name change requests.
     """
-    authentication_classes = (JwtAuthentication, SessionAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
 
     def create(self, request):
@@ -522,7 +513,6 @@ class AccountDeactivationView(APIView):
     Account deactivation viewset. Currently only supports POST requests.
     Only admins can deactivate accounts.
     """
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanDeactivateUser)
 
     def post(self, request, username):
@@ -581,6 +571,15 @@ class DeactivateLogoutView(APIView):
         Marks the user as having no password set for deactivation purposes,
         and logs the user out.
         """
+
+        # Ensure the account deletion is not disable
+        enable_account_deletion = configuration_helpers.get_value(
+            'ENABLE_ACCOUNT_DELETION', settings.FEATURES.get('ENABLE_ACCOUNT_DELETION', False)
+        )
+
+        if not enable_account_deletion:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
         user_model = get_user_model()
         try:
             # Get the username from the request and check that it exists
@@ -692,7 +691,6 @@ class AccountRetirementPartnerReportView(ViewSet):
     ORIGINAL_NAME_KEY = 'original_name'
     STUDENT_ID_KEY = 'student_id'
 
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanRetireUser,)
     parser_classes = (JSONParser,)
     serializer_class = UserRetirementStatusSerializer
@@ -746,48 +744,7 @@ class AccountRetirementPartnerReportView(ViewSet):
             'created': retirement_status.created,
         }
 
-        # Some orgs have a custom list of headings and content for the partner report. Add this, if applicable.
-        self._add_orgs_config_for_user(retirement, retirement_status.user)
-
         return retirement
-
-    def _add_orgs_config_for_user(self, retirement, user):
-        """
-        Check to see if the user's info was sent to any partners (orgs) that have a a custom list of headings and
-        content for the partner report. If so, add this.
-        """
-        # See if the MicroBachelors coaching provider needs to be notified of this user's retirement
-        if has_ever_consented_to_coaching is not None and has_ever_consented_to_coaching(user):
-            # See if the user has a MicroBachelors external id. If not, they were never sent to the
-            # coaching provider.
-            external_ids = ExternalId.objects.filter(
-                user=user,
-                external_id_type__name=ExternalIdType.MICROBACHELORS_COACHING
-            )
-            if external_ids.exists():
-                # User has an external id. Add the additional info.
-                external_id = str(external_ids[0].external_user_id)
-                self._add_coaching_orgs_config(retirement, external_id)
-
-    def _add_coaching_orgs_config(self, retirement, external_id):
-        """
-        Add the orgs configuration for MicroBachelors coaching
-        """
-        # Add the custom field headings
-        retirement[AccountRetirementPartnerReportView.ORGS_CONFIG_KEY] = [
-            {
-                AccountRetirementPartnerReportView.ORGS_CONFIG_ORG_KEY: 'mb_coaching',
-                AccountRetirementPartnerReportView.ORGS_CONFIG_FIELD_HEADINGS_KEY: [
-                    AccountRetirementPartnerReportView.STUDENT_ID_KEY,
-                    AccountRetirementPartnerReportView.ORIGINAL_EMAIL_KEY,
-                    AccountRetirementPartnerReportView.ORIGINAL_NAME_KEY,
-                    AccountRetirementPartnerReportView.DELETION_COMPLETED_KEY
-                ]
-            }
-        ]
-
-        # Add the custom field value
-        retirement[AccountRetirementPartnerReportView.STUDENT_ID_KEY] = external_id
 
     @request_requires_username
     def retirement_partner_status_create(self, request):
@@ -871,7 +828,6 @@ class CancelAccountRetirementStatusView(ViewSet):
     """
     Provides API endpoints for canceling retirement process for a user's account.
     """
-    authentication_classes = (JwtAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated, CanCancelUserRetirement,)
 
     def cancel_retirement(self, request):
@@ -913,7 +869,6 @@ class AccountRetirementStatusView(ViewSet):
     """
     Provides API endpoints for managing the user retirement process.
     """
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanRetireUser,)
     parser_classes = (JSONParser,)
     serializer_class = UserRetirementStatusSerializer
@@ -1120,7 +1075,6 @@ class LMSAccountRetirementView(ViewSet):
     """
     Provides an API endpoint for retiring a user in the LMS.
     """
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanRetireUser,)
     parser_classes = (JSONParser,)
 
@@ -1176,7 +1130,6 @@ class AccountRetirementView(ViewSet):
     """
     Provides API endpoint for retiring a user.
     """
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanRetireUser,)
     parser_classes = (JSONParser,)
 
@@ -1316,7 +1269,6 @@ class UsernameReplacementView(APIView):
     This API will be called first, before calling the APIs in other services as this
     one handles the checks on the usernames provided.
     """
-    authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated, CanReplaceUsername)
 
     def post(self, request):

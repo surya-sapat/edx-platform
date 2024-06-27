@@ -510,7 +510,7 @@ such that the value can be defined later than this assignment (file load order).
                             text: identifier
                         }));
                     }
-                } 
+                }
                 return displayResponse.$task_response.append($taskResSection);
             };
             if (errors.length === 0 && successes.length === 0 && noUsers.length === 0) {
@@ -580,9 +580,6 @@ such that the value can be defined later than this assignment (file load order).
                 }()));
             }
             if (noUsers.length) {
-                noUsers.push($(
-                    gettext('Users must create and activate their account before they can be promoted to beta tester.'))
-                );
                 return renderList(gettext('Could not find users associated with the following identifiers:'), (function() { // eslint-disable-line max-len
                     // eslint-disable-next-line no-shadow
                     var j, len1, results;
